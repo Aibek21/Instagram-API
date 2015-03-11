@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">Instagram</string>
+    <string name="hello_world">Hello world!</string>
+    <string name="action_settings">Settings</string>
+    <string name="client_id">9df68c71fa2845f7a838b306b7cad846</string>
+    <string name="client_secret">683b3a79025b4d3b92b09f23c83dd60d</string>
+    <string name="redirect_uri">http://favella.kz</string>
+    <string name="title_activity_photos_list">PhotosListActivity</string>
+    <string name="title_activity_photo_details">PhotoDetailsActivity</string>
+
+</resources>
