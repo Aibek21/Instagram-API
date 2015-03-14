@@ -8,11 +8,31 @@ import android.os.Parcelable;
  */
 public class Photo implements Parcelable{
 
-    private String thumbnail;
+    private String lowResolution;
     private String standardPhoto;
     private String likes;
     private String id;
+
+    public String getUserName() {
+        return userName;
+    }
+
+    public void setUserName(String userName) {
+        this.userName = userName;
+    }
+
     private String comments;
+    private boolean userHasLiked;
+    private String userName;
+
+    public boolean isUserHasLiked() {
+        return userHasLiked;
+    }
+
+    public void setUserHasLiked(boolean userHasLiked) {
+        this.userHasLiked = userHasLiked;
+    }
+
     public String getId() {
         return id;
     }
@@ -31,8 +51,8 @@ public class Photo implements Parcelable{
 
 
 
-    public void setThumbnail(String thumbnail) {
-        this.thumbnail = thumbnail;
+    public void setLowResolution(String lowResolution) {
+        this.lowResolution = lowResolution;
     }
 
     public void setStandardPhoto(String standardPhoto) {
@@ -43,9 +63,9 @@ public class Photo implements Parcelable{
         this.likes = likes;
     }
 
-    public String getThumbnail() {
+    public String getLowResolution() {
 
-        return thumbnail;
+        return lowResolution;
     }
 
     public String getStandardPhoto() {
@@ -63,7 +83,7 @@ public class Photo implements Parcelable{
 
     @Override
     public void writeToParcel(Parcel dest, int flags) {
-        dest.writeString(thumbnail);
+        dest.writeString(lowResolution);
         dest.writeString(standardPhoto);
         dest.writeString(id);
         dest.writeString(likes);

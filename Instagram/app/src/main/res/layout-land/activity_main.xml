@@ -11,11 +11,12 @@
 
 
     <Button
-        android:layout_width="match_parent"
+        android:layout_width="300dp"
         android:layout_height="wrap_content"
         android:text="Login"
         android:layout_marginTop="20dp"
-        android:id="@+id/login"/>
+        android:id="@+id/login"
+        android:layout_gravity="center_horizontal"/>
 
 
 
@@ -35,6 +36,14 @@
             android:layout_centerInParent="true"/>
 
     </RelativeLayout>
+
+
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:id="@+id/webPlaceHolder"
+        ></FrameLayout>
 
 
 </FrameLayout>

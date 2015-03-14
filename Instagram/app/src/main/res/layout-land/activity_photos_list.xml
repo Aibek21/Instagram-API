@@ -9,16 +9,20 @@
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent">
-    <GridView
-        android:id="@+id/grid_view"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:numColumns="auto_fit"
-        android:gravity="center"
-        android:stretchMode="columnWidth"
-        android:background="#000">
-    </GridView>
+        <ListView
+            android:id="@+id/grid_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:numColumns="5"
+            android:gravity="center"
+            android:stretchMode="columnWidth"
+            android:background="#dedede"
+            android:paddingLeft="10dp"
+            android:paddingRight="10dp"
+            android:dividerHeight="10dp"
+            android:divider="#dedede">
+        </ListView>
 
     <RelativeLayout
         android:layout_width="match_parent"

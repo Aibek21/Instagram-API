@@ -1,5 +1,6 @@
 package ibecsystems.kz.instagram;
 
+import android.app.TaskStackBuilder;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -8,21 +9,31 @@ import android.graphics.BitmapFactory;
 import android.os.AsyncTask;
 import android.os.Parcelable;
 import android.os.PersistableBundle;
+import android.support.v4.app.NavUtils;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AbsListView;
 import android.widget.BaseAdapter;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
+import org.apache.http.HttpResponse;
+import org.apache.http.client.methods.HttpDelete;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.util.EntityUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONTokener;
@@ -43,21 +54,29 @@ public class PhotoDetailsActivity extends ActionBarActivity {
     private String accessToken;
     private final String PREFNAME = "INSTAPREFERENCES";
     private SharedPreferences sharedPreferences;
-    private String photoURL, commentsNumber, likesNumber;
+    private String photoURL, commentsNumber="0", likesNumber, username;
     ArrayList<Comment> comments;
     RelativeLayout progressBar, progressBar1;
     ListView commentList;
     ImageView image;
     TextView numberOfComments, numberOfLikes;
+    boolean isUserHasLiked;
     CommentListAdapter adapter;
     Bitmap mainImage;
+    CheckBox checkBox;
+    boolean isLoading=true;
+    private String max_id;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_photo_details);
+
+
+        getSupportActionBar().setDisplayHomeAsUpEnabled(false);
         Intent intent = getIntent();
         id = intent.getStringExtra("id");
-
+        username = intent.getStringExtra("username");
+        getSupportActionBar().setTitle(username);
         sharedPreferences = getSharedPreferences(PREFNAME, MODE_PRIVATE);
         accessToken = sharedPreferences.getString("access_token", "");
 
@@ -81,6 +100,27 @@ public class PhotoDetailsActivity extends ActionBarActivity {
 
         }else
             new getInfo().execute();
+
+
+        commentList.setOnScrollListener(new AbsListView.OnScrollListener() {
+            @Override
+            public void onScrollStateChanged(AbsListView view, int scrollState) {
+
+            }
+
+            @Override
+            public void onScroll(AbsListView view, int firstVisibleItem, int visibleItemCount, int totalItemCount) {
+
+                if(firstVisibleItem+visibleItemCount>=totalItemCount && !isLoading && comments.size()!=Integer.parseInt(commentsNumber)){
+
+                    isLoading=true;
+                    new getComments().execute();
+
+                }
+
+
+            }
+        });
     }
 
 
@@ -93,6 +133,15 @@ public class PhotoDetailsActivity extends ActionBarActivity {
         numberOfLikes = (TextView) findViewById(R.id.number_of_likes);
         comments = new ArrayList<Comment>();
 
+        checkBox = (CheckBox) findViewById(R.id.like);
+
+        checkBox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                new setLike().execute();
+            }
+        });
+
     }
 
     public void fillContent(){
@@ -103,6 +152,7 @@ public class PhotoDetailsActivity extends ActionBarActivity {
         adapter = new CommentListAdapter(PhotoDetailsActivity.this);
         commentList.setAdapter(adapter);
 
+        checkBox.setChecked(isUserHasLiked);
 
 
     }
@@ -163,6 +213,7 @@ public class PhotoDetailsActivity extends ActionBarActivity {
                 JSONObject jsonObject = (JSONObject) new JSONTokener(response).nextValue();
                 JSONObject dataJsonObject = jsonObject.getJSONObject("data");
 
+                isUserHasLiked = dataJsonObject.getBoolean("user_has_liked");
                 jsonObject = dataJsonObject.getJSONObject("images").getJSONObject("standard_resolution");
                 photoURL = jsonObject.getString("url");
 
@@ -182,13 +233,18 @@ public class PhotoDetailsActivity extends ActionBarActivity {
                     comment.setText(str);
                     JSONObject fromJsonObject = jsonObject.getJSONObject("from");
                     str = fromJsonObject.getString("username");
+
                     comment.setAuthor(str);
+
+                    str = jsonObject.getString("id");
+                    comment.setId(str);
 
                     Log.e("comment", str);
                     comments.add(comment);
 
                 }
 
+                max_id = comments.get(comments.size()-1).getId();
                 jsonObject = dataJsonObject.getJSONObject("likes");
                 likesNumber = jsonObject.getString("count");
 
@@ -210,8 +266,86 @@ public class PhotoDetailsActivity extends ActionBarActivity {
         {
             super.onPostExecute(result);
 
+            isLoading=false;
            fillContent();
             new ImageDownloader().execute();
+        };
+    }
+
+    private class getComments extends AsyncTask<Void, Void, Void> {
+
+        @Override
+        protected void onPreExecute()
+        {
+
+
+        };
+        @Override
+        protected Void doInBackground(Void... voids) {
+
+
+            try
+            {
+                isLoading=true;
+
+                String urlString = APIURL + "/media/" +id+"/comments/?access_token="+accessToken+"&max_id="+max_id+"&count=10";
+
+                //Log.e("response", urlString);
+
+                URL url = new URL(urlString);
+                InputStream inputStream = url.openConnection().getInputStream();
+                String response = streamToString(inputStream);
+                //Log.e("response", response);
+
+                JSONObject jsonObject = (JSONObject) new JSONTokener(response).nextValue();
+
+
+
+
+                JSONArray jsonArray = jsonObject.getJSONArray("data");
+
+                for(int i=0; i<jsonArray.length(); i++) {
+                    Comment comment = new Comment();
+
+                    jsonObject = jsonArray.getJSONObject(i);
+
+                    String str = jsonObject.getString("text");
+
+                    comment.setText(str);
+                    JSONObject fromJsonObject = jsonObject.getJSONObject("from");
+                    str = fromJsonObject.getString("username");
+
+                    comment.setAuthor(str);
+
+                    str = jsonObject.getString("id");
+                    comment.setId(str);
+
+                    Log.e("comment", str);
+                    comments.add(comment);
+
+                }
+
+                max_id = comments.get(comments.size()-1).getId();
+
+
+
+            }catch (Exception e)
+            {
+                e.printStackTrace();
+            }
+
+
+
+
+
+
+            return null;
+        }
+        protected void onPostExecute(Void result)
+        {
+            super.onPostExecute(result);
+
+            adapter.notifyDataSetChanged();
         };
     }
 
@@ -313,6 +447,72 @@ public class PhotoDetailsActivity extends ActionBarActivity {
     }
 
 
+    private class setLike extends AsyncTask<Void, Void, Void> {
+
+
+
+
+
+        @Override
+        protected void onPreExecute()
+        {
+
+            Integer integer = Integer.parseInt(likesNumber);
+            if(isUserHasLiked)
+                integer--;
+            else integer++;
+            likesNumber = integer.toString();
+            numberOfLikes.setText(likesNumber);
+        };
+        @Override
+        protected Void doInBackground(Void... voids) {
+
+
+            try
+            {
+
+                DefaultHttpClient httpClient = new DefaultHttpClient();
+                String urlString = APIURL + "/media/"+id+"/likes/"+"?access_token=" + accessToken ;;
+
+                if(isUserHasLiked) {
+                    HttpDelete delete = new HttpDelete(urlString);
+                    HttpResponse httpResponse = httpClient.execute(delete);
+                    String response = EntityUtils.toString(httpResponse.getEntity());
+
+                    isUserHasLiked=false;
+                }else{
+                    HttpPost post = new HttpPost(urlString);
+                    HttpResponse httpResponse = httpClient.execute(post);
+                    String response = EntityUtils.toString(httpResponse.getEntity());
+
+                    isUserHasLiked = true;
+                    Log.e("response", response);
+                }
+
+
+
+
+
+
+            }catch (Exception e)
+            {
+                e.printStackTrace();
+            }
+
+
+
+
+
+
+            return null;
+        }
+        protected void onPostExecute(Void result)
+        {
+            super.onPostExecute(result);
+
+
+        };
+    }
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
@@ -323,6 +523,8 @@ public class PhotoDetailsActivity extends ActionBarActivity {
 
         super.onSaveInstanceState(outState);
     }
+
+
 
 
     @Override
@@ -340,10 +542,10 @@ public class PhotoDetailsActivity extends ActionBarActivity {
         int id = item.getItemId();
 
         //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
-            return true;
-        }
 
+
+        //if(id==R.id.home)
+            //finish();
         return super.onOptionsItemSelected(item);
     }
 }

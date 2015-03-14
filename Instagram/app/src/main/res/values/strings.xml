@@ -9,5 +9,6 @@
     <string name="redirect_uri">http://favella.kz</string>
     <string name="title_activity_photos_list">PhotosListActivity</string>
     <string name="title_activity_photo_details">PhotoDetailsActivity</string>
+    <string name="action_exit">Выйти</string>
 
 </resources>

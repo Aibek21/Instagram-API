@@ -10,6 +10,16 @@ public class Comment implements Parcelable{
 
     private String author;
     private String text;
+    private String id;
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
     public String getText() {
         return text;
     }

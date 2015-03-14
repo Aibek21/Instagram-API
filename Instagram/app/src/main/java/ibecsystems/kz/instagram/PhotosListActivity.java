@@ -21,15 +21,27 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.AbsListView;
 import android.widget.AdapterView;
 import android.widget.BaseAdapter;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.GridView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ListView;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpDelete;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.util.EntityUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONTokener;
@@ -67,10 +79,10 @@ public class PhotosListActivity extends ActionBarActivity {
 
     Utils utils;
     int columnWidth;
-    GridView gridView;
+    ListView listView;
     RelativeLayout progressBar;
     GridViewImageAdapter adapter;
-    boolean isLoading=false;
+    boolean isLoading=true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -92,8 +104,11 @@ public class PhotosListActivity extends ActionBarActivity {
             accessToken = savedInstanceState.getString("accessToken");
             max_id = savedInstanceState.getString("max_id");
 
-            if(max_id!=null)
+            if(max_id!=null) {
+                setTitle();
                 fillContent();
+                isLoading=false;
+            }
             else
                 new getInfo().execute();
         }else
@@ -111,26 +126,9 @@ public class PhotosListActivity extends ActionBarActivity {
     }
 
     private void initilizeGridLayout() {
-        gridView = (GridView) findViewById(R.id.grid_view);
+        listView = (ListView) findViewById(R.id.grid_view);
 
-
-        if(this.getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT)
-        {
-            columnWidth = ((utils.getScreenWidth() - 30) / 3);
-            gridView.setNumColumns(3);
-        }else{
-            columnWidth = ((utils.getScreenWidth() - 40) / 5);
-            gridView.setNumColumns(5);
-        }
-
-
-        gridView.setColumnWidth(columnWidth);
-        gridView.setStretchMode(GridView.NO_STRETCH);
-        gridView.setPadding(5, 5, 5, 5);
-        gridView.setHorizontalSpacing(5);
-        gridView.setVerticalSpacing(5);
-
-        gridView.setOnScrollListener(new AbsListView.OnScrollListener() {
+        listView.setOnScrollListener(new AbsListView.OnScrollListener() {
             @Override
             public void onScrollStateChanged(AbsListView view, int scrollState) {
 
@@ -141,6 +139,7 @@ public class PhotosListActivity extends ActionBarActivity {
 
                 if(firstVisibleItem+visibleItemCount>=totalItemCount && !isLoading){
 
+                    isLoading=true;
                     new getPhotos().execute();
 
                 }
@@ -149,7 +148,7 @@ public class PhotosListActivity extends ActionBarActivity {
             }
         });
 
-        gridView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 showDetails(position);
@@ -162,21 +161,24 @@ public class PhotosListActivity extends ActionBarActivity {
         if (adapter == null) {
             progressBar.setVisibility(View.INVISIBLE);
             adapter = new GridViewImageAdapter(PhotosListActivity.this, columnWidth);
-            gridView.setAdapter(adapter);
+            listView.setAdapter(adapter);
         }else
             adapter.notifyDataSetChanged();
     }
     public void showDetails(int position){
 
-        sharedPreferences = getSharedPreferences(PREFNAME, MODE_PRIVATE);
-        SharedPreferences.Editor editor = sharedPreferences.edit();
-        editor.putString("access_token", accessToken);
-        editor.commit();
+
         Intent intent = new Intent(this, PhotoDetailsActivity.class);
         intent.putExtra("id", photos.get(position).getId());
+        intent.putExtra("username", photos.get(position).getUserName());
+
         startActivity(intent);
     }
 
+    public void setTitle(){
+        Log.e("username",username);
+        getSupportActionBar().setTitle(username);
+    }
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
@@ -235,26 +237,40 @@ public class PhotosListActivity extends ActionBarActivity {
 
             try
             {
-                URL url = new URL(tokenURLString);
-                HttpsURLConnection httpsURLConnection = (HttpsURLConnection) url.openConnection();
-                httpsURLConnection.setRequestMethod("POST");
-                httpsURLConnection.setDoInput(true);
-                httpsURLConnection.setDoOutput(true);
-                OutputStreamWriter outputStreamWriter = new OutputStreamWriter(httpsURLConnection.getOutputStream());
-                outputStreamWriter.write("client_id="+client_id+
-                        "&client_secret="+ client_secret +
-                        "&grant_type=authorization_code" +
-                        "&redirect_uri="+CALLBACKURL+
-                        "&code=" + token);
-                outputStreamWriter.flush();
-                InputStream inputStream = httpsURLConnection.getInputStream();
-                String response = streamToString(inputStream);
-                JSONObject jsonObject = (JSONObject) new JSONTokener(response).nextValue();
-                 accessToken = jsonObject.getString("access_token");
-                 user_id = jsonObject.getJSONObject("user").getString("id");
-                Log.e("id", user_id);
-                 username = jsonObject.getJSONObject("user").getString("username");
-                Log.e("username", username);
+                accessToken = sharedPreferences.getString("access_token", "");
+                username = sharedPreferences.getString("username", "");
+                user_id = sharedPreferences.getString("user_id", "");
+
+
+                if(accessToken.equals("")) {
+                    URL url = new URL(tokenURLString);
+                    HttpsURLConnection httpsURLConnection = (HttpsURLConnection) url.openConnection();
+                    httpsURLConnection.setRequestMethod("POST");
+                    httpsURLConnection.setDoInput(true);
+                    httpsURLConnection.setDoOutput(true);
+                    OutputStreamWriter outputStreamWriter = new OutputStreamWriter(httpsURLConnection.getOutputStream());
+                    outputStreamWriter.write("client_id=" + client_id +
+                            "&client_secret=" + client_secret +
+                            "&grant_type=authorization_code" +
+                            "&redirect_uri=" + CALLBACKURL +
+                            "&code=" + token);
+                    outputStreamWriter.flush();
+                    InputStream inputStream = httpsURLConnection.getInputStream();
+                    String response = streamToString(inputStream);
+                    JSONObject jsonObject = (JSONObject) new JSONTokener(response).nextValue();
+                    accessToken = jsonObject.getString("access_token");
+                    user_id = jsonObject.getJSONObject("user").getString("id");
+                    Log.e("id", user_id);
+                    username = jsonObject.getJSONObject("user").getString("username");
+                    Log.e("username1", username);
+
+                    sharedPreferences = getSharedPreferences(PREFNAME, MODE_PRIVATE);
+                    SharedPreferences.Editor editor = sharedPreferences.edit();
+                    editor.putString("access_token", accessToken);
+                    editor.putString("username", username);
+                    editor.putString("user_id", user_id);
+                    editor.commit();
+                }
             }catch (Exception e)
             {
                 e.printStackTrace();
@@ -266,6 +282,7 @@ public class PhotosListActivity extends ActionBarActivity {
         protected void onPostExecute(Void result)
         {
             super.onPostExecute(result);
+            setTitle();
             new getPhotos().execute();
         };
     }
@@ -289,9 +306,9 @@ public class PhotosListActivity extends ActionBarActivity {
 
                 isLoading=true;
                 if(max_id!=null) {
-                    urlString = APIURL + "/users/" + user_id + "/media/recent/?max_id="+max_id+"&access_token=" + accessToken ;
+                    urlString = APIURL + "/users/self/feed/?max_id="+max_id+"&count=10"+"&access_token=" + accessToken ;
                 }else{
-                    urlString = APIURL + "/users/" + user_id + "/media/recent/?access_token=" + accessToken ;
+                    urlString = APIURL + "/users/self/feed/?access_token=" + accessToken +"&count=10";
                 }
 
                 //Log.e("response", urlString);
@@ -308,11 +325,14 @@ public class PhotosListActivity extends ActionBarActivity {
                     Photo photo = new Photo();
 
                     jsonObject = jsonArray.getJSONObject(i);
-                    JSONObject mainImageJsonObject = jsonObject.getJSONObject("images").getJSONObject("thumbnail");
+                    photo.setUserHasLiked(jsonObject.getBoolean("user_has_liked"));
+                    JSONObject mainImageJsonObject = jsonObject.getJSONObject("images").getJSONObject("low_resolution");
                     String str = mainImageJsonObject.getString("url");
-                    photo.setThumbnail(str);
+                    photo.setLowResolution(str);
 
 
+                    str = jsonObject.getJSONObject("user").getString("username");
+                    photo.setUserName(str);
 
                     mainImageJsonObject = jsonObject.getJSONObject("comments");
                     str = mainImageJsonObject.getString("count");
@@ -331,6 +351,10 @@ public class PhotosListActivity extends ActionBarActivity {
                 }
 
                 max_id = photos.get(photos.size()-1).getId();
+
+                Integer integer = photos.size();
+
+                Log.e("size", integer.toString());
 
             }catch (Exception e)
             {
@@ -382,9 +406,9 @@ public class PhotosListActivity extends ActionBarActivity {
         }
 
         @Override
-        public View getView(int position, View convertView, ViewGroup parent) {
+        public View getView(final int position, View convertView, ViewGroup parent) {
 
-            ViewHolder holder;
+            final ViewHolder holder;
             //View root = convertView;
 
             if(convertView==null) {
@@ -394,8 +418,9 @@ public class PhotosListActivity extends ActionBarActivity {
                 holder.imageView = (ImageView)convertView.findViewById(R.id.image);
                 holder.comments = (TextView) convertView.findViewById(R.id.number_of_comments);
                 holder.likes = (TextView)convertView.findViewById(R.id.number_of_likes);
+                holder.like = (CheckBox) convertView.findViewById(R.id.like);
+                holder.userName = (TextView) convertView.findViewById(R.id.username);
                 convertView.setTag(holder);
-
 
             }else {
                 holder = (ViewHolder) convertView.getTag();
@@ -405,18 +430,45 @@ public class PhotosListActivity extends ActionBarActivity {
 
 
 
-            holder.imageView.setScaleType(ImageView.ScaleType.FIT_XY);
-            holder.imageView.setLayoutParams(new LinearLayout.LayoutParams(imageWidth,
-                    imageWidth));
+            //holder.imageView.setScaleType(ImageView.ScaleType.FIT_XY);
+            //holder.imageView.setLayoutParams(new LinearLayout.LayoutParams(imageWidth,
+              //      imageWidth));
 
-            holder.comments.setText(photos.get(position).getComments());
+            Photo photo = photos.get(position);
+            holder.comments.setText(photo.getComments());
 
-            holder.likes.setText(photos.get(position).getLikes());
+            holder.likes.setText(photo.getLikes());
 
-            String url =photos.get(position).getThumbnail();
+            holder.like.setChecked(photo.isUserHasLiked());
+
+            holder.userName.setText(photo.getUserName());
+            String url =photos.get(position).getLowResolution();
+
             if(images.get(url) != null)
               holder.imageView.setImageBitmap(images.get(url));
             else new ImageDownloader(holder.imageView, position).execute();
+
+            holder.like.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+                @Override
+                public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+
+                    Photo photo = photos.get(position);
+                    Integer tmp = Integer.parseInt(photo.getLikes());
+                    if(photo.isUserHasLiked())
+                        tmp--;
+                    else  tmp++;
+                    photos.get(position).setLikes(tmp.toString());
+                    holder.likes.setText( photos.get(position).getLikes());
+                    new setLike(position).execute();
+                }
+            });
+
+            convertView.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    showDetails(position);
+                }
+            });
 
             return convertView;
         }
@@ -439,7 +491,7 @@ public class PhotosListActivity extends ActionBarActivity {
 
             protected Bitmap doInBackground(String... params) {
 
-                 url1 = photos.get(pos).getThumbnail();
+                 url1 = photos.get(pos).getLowResolution();
                 Log.e("url", url1);
                 URL url = null;
                 try {
@@ -469,10 +521,75 @@ public class PhotosListActivity extends ActionBarActivity {
         }
 
 
+        private class setLike extends AsyncTask<Void, Void, Void> {
+
+
+            int pos;
+
+            public setLike(int pos){
+                this.pos = pos;
+            }
+            @Override
+            protected void onPreExecute()
+            {
+
+
+                //adapter.notifyDataSetChanged();
+
+
+            };
+            @Override
+            protected Void doInBackground(Void... voids) {
+
+
+                try
+                {
+
+                    DefaultHttpClient httpClient = new DefaultHttpClient();
+                    String urlString = APIURL + "/media/"+photos.get(pos).getId()+"/likes/"+"?access_token=" + accessToken ;;
+
+                    if(photos.get(pos).isUserHasLiked()) {
+                        HttpDelete delete = new HttpDelete(urlString);
+                        HttpResponse httpResponse = httpClient.execute(delete);
+                        String response = EntityUtils.toString(httpResponse.getEntity());
+                        photos.get(pos).setUserHasLiked(false);
+                    }else{
+                        HttpPost post = new HttpPost(urlString);
+                        HttpResponse httpResponse = httpClient.execute(post);
+                        String response = EntityUtils.toString(httpResponse.getEntity());
+                        photos.get(pos).setUserHasLiked(true);
+                        Log.e("response", response);
+                    }
+
+
+
+
+
+
+                }catch (Exception e)
+                {
+                    e.printStackTrace();
+                }
+
+
+
+
+
+
+                return null;
+            }
+            protected void onPostExecute(Void result)
+            {
+                super.onPostExecute(result);
+
+
+            };
+        }
 
 
 
     }
+
 
 
 
@@ -491,10 +608,51 @@ public class PhotosListActivity extends ActionBarActivity {
         int id = item.getItemId();
 
         //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
+        if (id == R.id.action_exit) {
+
+
+            exit();
             return true;
         }
 
         return super.onOptionsItemSelected(item);
     }
+
+
+    public void exit(){
+        WebView webView = new WebView(this);
+        webView.loadUrl("https://instagram.com/accounts/logout/");
+        webView.setVerticalScrollBarEnabled(false);
+        webView.setHorizontalScrollBarEnabled(false);
+        webView.setWebViewClient(new AuthWebViewClient());
+        webView.getSettings().setJavaScriptEnabled(true);
+
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.remove("token");
+        editor.remove("access_token");
+        editor.remove("username");
+        editor.remove("user_id");
+        editor.commit();
+
+        Intent intent = new Intent(this, MainActivity.class);
+        startActivity(intent);
+        finish();
+    }
+
+    public class AuthWebViewClient extends WebViewClient
+    {
+        @Override
+        public void onPageFinished(WebView view, String url) {
+            super.onPageFinished(view, url);
+
+        }
+
+        @Override
+        public boolean shouldOverrideUrlLoading(WebView view, String url)
+        {
+
+            return false;
+        }
+    }
+
 }

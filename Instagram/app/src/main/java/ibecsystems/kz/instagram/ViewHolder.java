@@ -1,5 +1,6 @@
 package ibecsystems.kz.instagram;
 
+import android.widget.CheckBox;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -11,4 +12,6 @@ public class ViewHolder {
     ImageView imageView;
     TextView comments;
     TextView likes;
+    CheckBox like;
+    TextView userName;
 }
